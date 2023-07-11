@@ -1,3 +1,4 @@
 # nerc-nagios
 
-Container build for NERC deployment of Nagios monitor.
+A locally maintained container build of Nagios monitor for NERC
+environment.  Based on: https://github.com/JasonRivers/Docker-Nagios
