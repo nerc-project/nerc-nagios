@@ -1,0 +1,9 @@
+- name: Restart Webserver
+  ansible.builtin.service:
+    name: "container-{{ nerc_nagios_name }}-httpd"
+    state: restarted
+
+- name: Restart Nagios
+  ansible.builtin.service:
+    name: "container-{{ nerc_nagios_name }}"
+    state: restarted

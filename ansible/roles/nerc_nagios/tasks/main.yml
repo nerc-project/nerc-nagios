@@ -1,0 +1,64 @@
+- name: Create directory structure
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+    state: directory
+  loop:
+    - { path: '{{ nerc_nagios_prefix }}',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
+    - { path: '{{ nerc_nagios_prefix }}/etc-nagios',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
+
+- name: Create a list of nagios volume mounts
+  ansible.builtin.set_fact:
+    nagios_mounts:
+      - "{{ nerc_nagios_prefix }}/etc-nagios:/etc/nagios-tmp:ro"
+      - "/tmp:/host_tmp:rw"
+
+- name: Create Nagios container
+  containers.podman.podman_container:
+    name: "{{ nerc_nagios_name }}"
+    state: present
+    image: "ghcr.io/nerc-project/nerc-nagios:{{ nerc_nagios_version }}"
+    security_opt:
+      - 'label=disable'
+    generate_systemd:
+      names: true
+      new: true
+      path: /etc/systemd/system
+    volumes: "{{ nagios_mounts }}"
+    command:
+      - /usr/sbin/nagios
+      - /etc/nagios/nagios.cfg
+
+- name: Create Nagios webserver container
+  containers.podman.podman_container:
+    name: "{{ nerc_nagios_name }}-httpd"
+    state: present
+    image: "ghcr.io/nerc-project/nerc-nagios:{{ nerc_nagios_version }}"
+    security_opt:
+      - 'label=disable'
+    generate_systemd:
+      names: true
+      new: true
+      path: /etc/systemd/system
+    volumes: "{{ nagios_mounts }}"
+    command:
+      - /usr/sbin/httpd
+      - -DFOREGROUND
+
+- name: Enable and start systemd containers
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: true
+    state: started
+    enabled: true
+  loop:
+    - "container-{{ nerc_nagios_name }}"
+    - "container-{{ nerc_nagios_name }}-httpd"
