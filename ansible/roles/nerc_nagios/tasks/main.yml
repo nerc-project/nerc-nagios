@@ -1,0 +1,111 @@
+- name: Create directory structure
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+    state: directory
+  loop:
+    - { path: '{{ nerc_nagios_prefix }}',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
+    - { path: '{{ nerc_nagios_prefix }}/etc-nagios',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
+    - { path: '{{ nerc_nagios_prefix }}/spool-nagios',
+        owner: '{{ nerc_nagios_uid }}',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0755' }
+    - { path: '{{ nerc_nagios_prefix }}/spool-nagios/checkresults',
+        owner: '{{ nerc_nagios_uid }}',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0750' }
+    - { path: '{{ nerc_nagios_prefix }}/spool-nagios/cmd',
+        owner: '{{ nerc_nagios_uid }}',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '2755' }
+    - { path: '{{ nerc_nagios_prefix }}/log-nagios',
+        owner: '{{ nerc_nagios_uid }}',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0750' }
+
+    - { path: '{{ nerc_nagios_prefix }}/run-php-fpm',
+        owner: '{{ nerc_nagios_uid }}',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0755' }
+
+- name: Create a list of nagios volume mounts
+  ansible.builtin.set_fact:
+    nagios_mounts:
+      - "{{ nerc_nagios_prefix }}/etc-nagios:/etc/nagios-tmp:ro"
+      - "{{ nerc_nagios_prefix }}/spool-nagios:/var/spool/nagios:rw"
+      - "{{ nerc_nagios_prefix }}/log-nagios:/var/log/nagios:rw"
+      - "/tmp:/host_tmp:rw"
+
+- name: Create a list of nagios webserver mounts
+  ansible.builtin.set_fact:
+    nagios_httpd_mounts:
+      "{{ nagios_mounts + \
+       ['{{ nerc_nagios_prefix }}/run-php-fpm:/run/php-fpm:rw'] }}"
+
+- name: Create Nagios container
+  containers.podman.podman_container:
+    name: "{{ nerc_nagios_name }}"
+    state: present
+    image: "ghcr.io/nerc-project/nerc-nagios:{{ nerc_nagios_version }}"
+    security_opt: 'label=disable'
+    cap_add: CAP_NET_RAW
+    generate_systemd:
+      names: true
+      new: true
+      path: /etc/systemd/system
+    volumes: "{{ nagios_mounts }}"
+    command:
+      - /usr/sbin/nagios
+      - /etc/nagios/nagios.cfg
+
+- name: Create Nagios webserver container
+  containers.podman.podman_container:
+    name: "{{ nerc_nagios_name }}-httpd"
+    state: present
+    image: "ghcr.io/nerc-project/nerc-nagios:{{ nerc_nagios_version }}"
+    security_opt: 'label=disable'
+    generate_systemd:
+      names: true
+      new: true
+      path: /etc/systemd/system
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes: "{{ nagios_httpd_mounts }}"
+    command:
+      - /usr/sbin/httpd
+      - -DFOREGROUND
+
+- name: Create Nagios webserver container
+  containers.podman.podman_container:
+    name: "{{ nerc_nagios_name }}-fpm"
+    state: present
+    image: "ghcr.io/nerc-project/nerc-nagios:{{ nerc_nagios_version }}"
+    security_opt: 'label=disable'
+    generate_systemd:
+      names: true
+      new: true
+      path: /etc/systemd/system
+    volumes: "{{ nagios_httpd_mounts }}"
+    command:
+      - /usr/sbin/php-fpm
+      - --nodaemonize
+
+- name: Enable and start systemd containers
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: true
+    state: started
+    enabled: true
+  loop:
+    - "container-{{ nerc_nagios_name }}"
+    - "container-{{ nerc_nagios_name }}-httpd"
+    - "container-{{ nerc_nagios_name }}-fpm"

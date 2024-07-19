@@ -1,0 +1,6 @@
+---
+- name: Deploy Nagios
+  gather_facts: false
+  hosts: nagioshost
+  roles:
+    - nerc_nagios
