@@ -7,3 +7,8 @@
   ansible.builtin.service:
     name: "container-{{ nerc_nagios_name }}"
     state: restarted
+
+- name: Restart FPM
+  ansible.builtin.service:
+    name: "container-{{ nerc_nagios_name }}-fpm"
+    state: restarted
