@@ -14,6 +14,14 @@
         owner: 'root',
         group: 'root',
         mode: '0755' }
+    - { path: '{{ nerc_nagios_prefix }}/etc-nagios/private',
+        owner: 'root',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0750' }
+    - { path: '{{ nerc_nagios_prefix }}/etc-nagios/objects',
+        owner: 'root',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0750' }
     - { path: '{{ nerc_nagios_prefix }}/spool-nagios',
         owner: '{{ nerc_nagios_uid }}',
         group: '{{ nerc_nagios_gid }}',
@@ -34,10 +42,71 @@
         owner: 'root',
         group: 'root',
         mode: '0755' }
+    - { path: '{{ nerc_nagios_prefix }}/config-httpd',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
     - { path: '{{ nerc_nagios_prefix }}/run-php-fpm',
         owner: '{{ nerc_nagios_uid }}',
         group: '{{ nerc_nagios_gid }}',
         mode: '0755' }
+
+- name: Install Apache mod_openidc config template
+  ansible.builtin.template:
+    src: httpd/auth_openidc.conf.j2
+    dest: '{{ nerc_nagios_prefix }}/config-httpd/auth_openidc.conf'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'
+
+- name: Install Apache Netbox config template
+  ansible.builtin.template:
+    src: httpd/nagios.conf.j2
+    dest: '{{ nerc_nagios_prefix }}/config-httpd/nagios.conf'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'
+
+- name: Install Nagios config files
+  ansible.builtin.template:
+    src: 'nagios/{{ item.path }}.j2'
+    dest: '{{ nerc_nagios_prefix }}/etc-nagios/{{ item.path }}'
+    owner: '{{ item.owner }}'
+    group: '{{ item.group }}'
+    mode: '{{ item.mode }}'
+  loop:
+    - { path: 'nagios.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
+    - { path: 'cgi.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
+    - { path: 'private/resource.cfg',
+        owner: 'root',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0640' }
+    - { path: 'objects/commands.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
+    - { path: 'objects/contacts.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
+    - { path: 'objects/localhost.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
+    - { path: 'objects/templates.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
+    - { path: 'objects/timeperiods.cfg',
+        owner: 'root',
+        group: 'root',
+        mode: '0644' }
 
 - name: Generate self signed ssl cert
   ansible.builtin.shell: |
@@ -51,14 +120,12 @@
   register: mkselfcrt_output
   changed_when: mkselfcrt_output
 
-
 - name: Create a list of nagios volume mounts
   ansible.builtin.set_fact:
     nagios_mounts:
-      - "{{ nerc_nagios_prefix }}/etc-nagios:/etc/nagios-tmp:ro"
+      - "{{ nerc_nagios_prefix }}/etc-nagios:/etc/nagios:ro"
       - "{{ nerc_nagios_prefix }}/spool-nagios:/var/spool/nagios:rw"
       - "{{ nerc_nagios_prefix }}/log-nagios:/var/log/nagios:rw"
-      - "/tmp:/host_tmp:rw"
 
 - name: Create a list of nagios webserver mounts
   ansible.builtin.set_fact:
@@ -68,7 +135,11 @@
         '{{ nerc_nagios_prefix }}/certs-httpd/server.key:\
         /etc/pki/tls/private/localhost.key:ro', \
         '{{ nerc_nagios_prefix }}/certs-httpd/server.crt:\
-        /etc/pki/tls/certs/localhost.crt:ro'] }}"
+        /etc/pki/tls/certs/localhost.crt:ro', \
+        '{{ nerc_nagios_prefix }}/config-httpd/auth_openidc.conf:\
+        /etc/httpd/conf.d/auth_openidc.conf', \
+        '{{ nerc_nagios_prefix }}/config-httpd/nagios.conf:\
+        /etc/httpd/conf.d/nagios.conf'] }}"
 
 - name: Create Nagios container
   containers.podman.podman_container:
