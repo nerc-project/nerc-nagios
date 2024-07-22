@@ -30,11 +30,27 @@
         owner: '{{ nerc_nagios_uid }}',
         group: '{{ nerc_nagios_gid }}',
         mode: '0750' }
-
+    - { path: '{{ nerc_nagios_prefix }}/certs-httpd',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
     - { path: '{{ nerc_nagios_prefix }}/run-php-fpm',
         owner: '{{ nerc_nagios_uid }}',
         group: '{{ nerc_nagios_gid }}',
         mode: '0755' }
+
+- name: Generate self signed ssl cert
+  ansible.builtin.shell: |
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+      -keyout '{{ nerc_nagios_prefix }}/certs-httpd/server.key' \
+      -out '{{ nerc_nagios_prefix }}/certs-httpd/server.crt' \
+      -subj "/C=US/ST=MA/L=Holyoke/OU=NERC/CN={{ ansible_host }}" \
+      -addext "subjectAltName=DNS:{{ ansible_host }}"
+  args:
+    executable: bash
+  register: mkselfcrt_output
+  changed_when: mkselfcrt_output
+
 
 - name: Create a list of nagios volume mounts
   ansible.builtin.set_fact:
@@ -48,7 +64,11 @@
   ansible.builtin.set_fact:
     nagios_httpd_mounts:
       "{{ nagios_mounts + \
-       ['{{ nerc_nagios_prefix }}/run-php-fpm:/run/php-fpm:rw'] }}"
+       ['{{ nerc_nagios_prefix }}/run-php-fpm:/run/php-fpm:rw', \
+        '{{ nerc_nagios_prefix }}/certs-httpd/server.key:\
+        /etc/pki/tls/private/localhost.key:ro', \
+        '{{ nerc_nagios_prefix }}/certs-httpd/server.crt:\
+        /etc/pki/tls/certs/localhost.crt:ro'] }}"
 
 - name: Create Nagios container
   containers.podman.podman_container:
@@ -103,6 +123,7 @@
   ansible.builtin.systemd:
     name: "{{ item }}"
     daemon_reload: true
+    force: true
     state: started
     enabled: true
   loop:
