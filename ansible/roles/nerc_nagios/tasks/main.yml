@@ -18,10 +18,6 @@
         owner: 'root',
         group: '{{ nerc_nagios_gid }}',
         mode: '0750' }
-    - { path: '{{ nerc_nagios_prefix }}/etc-nagios/services',
-        owner: 'root',
-        group: '{{ nerc_nagios_gid }}',
-        mode: '0750' }
     - { path: '{{ nerc_nagios_prefix }}/etc-nagios/objects',
         owner: 'root',
         group: '{{ nerc_nagios_gid }}',
@@ -42,6 +38,10 @@
         owner: '{{ nerc_nagios_uid }}',
         group: '{{ nerc_nagios_gid }}',
         mode: '0750' }
+    - { path: '{{ nerc_nagios_prefix }}/scripts-nagios',
+        owner: 'root',
+        group: 'root',
+        mode: '0755' }
     - { path: '{{ nerc_nagios_prefix }}/certs-httpd',
         owner: 'root',
         group: 'root',
@@ -115,6 +115,15 @@
         group: 'root',
         mode: '0644' }
 
+- name: Install slack notification script
+  ansible.builtin.template:
+    src: 'slack_notification.sh.j2'
+    dest: '{{ nerc_nagios_prefix }}/scripts-nagios/slack_notification.sh'
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
+  when: slack_webhook_address
+
 - name: Check of ssl cert already exists
   ansible.builtin.stat:
     path: '{{ nerc_nagios_prefix }}/certs-httpd/server.crt'
@@ -140,6 +149,7 @@
       - "{{ nerc_nagios_prefix }}/etc-nagios:/etc/nagios:ro"
       - "{{ nerc_nagios_prefix }}/spool-nagios:/var/spool/nagios:rw"
       - "{{ nerc_nagios_prefix }}/log-nagios:/var/log/nagios:rw"
+      - "{{ nerc_nagios_prefix }}/scripts-nagios:/opt/nagios-scripts:ro"
 
 - name: Create a list of nagios webserver mounts
   ansible.builtin.set_fact:
