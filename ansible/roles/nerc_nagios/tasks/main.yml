@@ -18,6 +18,10 @@
         owner: 'root',
         group: '{{ nerc_nagios_gid }}',
         mode: '0750' }
+    - { path: '{{ nerc_nagios_prefix }}/etc-nagios/services',
+        owner: 'root',
+        group: '{{ nerc_nagios_gid }}',
+        mode: '0750' }
     - { path: '{{ nerc_nagios_prefix }}/etc-nagios/objects',
         owner: 'root',
         group: '{{ nerc_nagios_gid }}',
