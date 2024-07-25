@@ -31,8 +31,8 @@ define contact {
     alias                   Nagios Admin            ; Full name of user
     email                   nagios@localhost ;
 {% if slack_webhook_address is defined %}
-    host_notification_commands    notify-host-slack	
-    service_notification_commands	notify-service-slack
+    host_notification_commands    notify-host-slack
+    service_notification_commands    notify-service-slack
 {% endif %}
 }
 
