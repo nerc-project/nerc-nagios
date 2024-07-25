@@ -37,8 +37,24 @@ define command {
     command_line    /usr/bin/printf "%b" "***** Nagios *****\n\nNotification Type: $NOTIFICATIONTYPE$\n\nService: $SERVICEDESC$\nHost: $HOSTALIAS$\nAddress: $HOSTADDRESS$\nState: $SERVICESTATE$\n\nDate/Time: $LONGDATETIME$\n\nAdditional Info:\n\n$SERVICEOUTPUT$\n" | /usr/bin/mail -s "** $NOTIFICATIONTYPE$ Service Alert: $HOSTALIAS$/$SERVICEDESC$ is $SERVICESTATE$ **" $CONTACTEMAIL$
 }
 
+{% if slack_webhook_address is defined %}
+################################################################################
+#
+# SLACK NOTIFICATION COMMANDS
+#
+###############################################################################
 
+define command {
+    command_name    notify-host-slack
+    command_line   /bin/bash /opt/nagios-scripts/slack_notification.sh -a "$NOTIFICATIONTYPE$" -b "$HOSTNAME$" -c "$HOSTSTATE$" -d "$HOSTOUTPUT$"
+}
 
+define command {
+    command_name    notify-service-slack
+    command_line    /bin/bash /opt/nagios-scripts/slack_notification.sh -a "$NOTIFICATIONTYPE$" -b "$HOSTNAME$" -e "$SERVICEDESC$" -f "$SERVICESTATE$" -g "$SERVICEOUTPUT$"
+}
+
+{% endif %}
 ################################################################################
 #
 # SAMPLE HOST CHECK COMMANDS
@@ -55,8 +71,6 @@ define command {
     command_name    check-host-alive
     command_line    $USER1$/check_ping -H $HOSTADDRESS$ -w 3000.0,80% -c 5000.0,100% -p 5
 }
-
-
 
 ################################################################################
 #
